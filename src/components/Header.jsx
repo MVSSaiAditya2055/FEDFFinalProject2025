@@ -1,25 +1,14 @@
 import React, { useRef } from 'react'
 
-export default function Header(){
+export default function Header({ onSearch }) {
   const inputRef = useRef(null);
 
   function runSearch(q) {
     const qTrim = (q || '').trim();
-    if (!qTrim) {
-      // empty -> go home
-      location.hash = '#home';
-      return;
+    // Always call onSearch, let App handle empty/routing logic
+    if (onSearch) {
+      onSearch(qTrim);
     }
-    try {
-      if (window && window.fedfDoSearchWithQ) {
-        window.fedfDoSearchWithQ(qTrim);
-        // also update hash for history
-        location.hash = '#search-' + encodeURIComponent(qTrim);
-        return;
-      }
-    } catch (e) { /* ignore */ }
-    // fallback: update URL hash so legacy router handles it when ready
-    location.hash = '#search-' + encodeURIComponent(qTrim);
   }
 
   return (

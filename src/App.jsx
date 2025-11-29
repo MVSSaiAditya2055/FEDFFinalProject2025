@@ -1,26 +1,61 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { initLegacyApp } from './legacy'
+import { searchData } from './store'
 import Header from './components/Header'
 import Carousel from './components/Carousel'
 import Home from './components/Home'
 import Calendar from './components/Calendar'
+import SearchResults from './components/SearchResults'
 
 export default function App() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState({ artworks: [], artists: [] });
+  const [isSearching, setIsSearching] = useState(false);
+
   useEffect(() => {
     // Initialize legacy DOM-based app (seeding, routing, listeners).
     // This keeps original app behavior while providing a React mount.
     initLegacyApp();
+
+    // Listen for hash changes to clear search if user navigates home
+    const handleHashChange = () => {
+      if (location.hash === '#home' || location.hash === '') {
+        setIsSearching(false);
+        setSearchQuery('');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, [])
+
+  const handleSearch = (q) => {
+    const query = (q || '').trim();
+    if (!query) {
+      setIsSearching(false);
+      setSearchQuery('');
+      location.hash = '#home';
+      return;
+    }
+    const results = searchData(query);
+    setSearchResults(results);
+    setSearchQuery(query);
+    setIsSearching(true);
+    location.hash = '#search-' + encodeURIComponent(query);
+  };
 
   return (
     <>
-      <Header />
+      <Header onSearch={handleSearch} />
 
       <main id="app">
-        <section>
-          <Carousel />
-          <Home />
-        </section>
+        {isSearching ? (
+          <SearchResults results={searchResults} query={searchQuery} />
+        ) : (
+          <section>
+            <Carousel />
+            <Home />
+          </section>
+        )}
 
         <Calendar />
       </main>
@@ -38,20 +73,6 @@ export default function App() {
         </div>
       </footer>
 
-      {/* template used by legacy script */}
-      <template id="searchResultsTemplate">
-        <div>
-          <h3>Search Results</h3>
-          <div style={{ marginTop: 8 }}>
-            <h4>Art Pieces</h4>
-            <div id="artResults"></div>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <h4>Artists</h4>
-            <div id="artistResults"></div>
-          </div>
-        </div>
-      </template>
       {/* Dedicated search results page (legacy will render here when available) */}
       <div id="searchPage" className="section" aria-live="polite" style={{ display: 'none' }}></div>
     </>

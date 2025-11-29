@@ -1,79 +1,23 @@
 // Legacy app initializer: re-uses the original DOM-based app logic.
 // We wrap the original script in a function and export initLegacyApp()
+import { loadStore, saveStore, ensureSeedMerged, loadCurrentUser, saveCurrentUser as saveUserToSession, artistById, artById } from './store';
+
 export function initLegacyApp() {
   // Provide safe fallbacks immediately so React header handlers never call undefined
   try {
     if (typeof window !== 'undefined') {
-      window.fedfDoSearch = function() { alert('Search is temporarily unavailable. Initializing app...'); };
-      window.fedfDoSearchWithQ = function(q) { alert('Search is temporarily unavailable. Initializing app...'); };
+      window.fedfDoSearch = function () { /* Handled by React now */ };
+      window.fedfDoSearchWithQ = function (q) { /* Handled by React now */ };
     }
-    /* ====== Client-side "Database" Seed Data ====== */
-    const seed = {
-      users: [
-        { id: 'u_admin', name:'Admin', email:'admin@gallery.test', password:'adminpass', role:'admin', verified:true },
-        { id: 'u_v1', name:'Asha Visitor', email:'asha@visitor.test', password:'pass123', role:'visitor', verified:true },
-        // seed curator account
-        { id: 'u_curator', name:'K. Curator', email:'curator@gallery.test', password:'curpass', role:'curator', verified:true }
-      ],
-      artists: [
-        { id:'a1', name:'John Sun', bio:'Contemporary painter exploring light and mythology.', verified:true, photo:'https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=300&q=60' },
-        { id:'a2', name:'Meera Rao', bio:'Textile & folk art revivalist.', verified:true, photo:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=60' }
-      ],
-      artworks: [
-        { id:'art1', title:"Sun Wukong's Might", artistId:'a1', description:'A dramatic oil painting inspired by myth and sunlight. Cultural notes: references to East Asian myth of the Great Monkey King.', image:'https://www.outregallery.com/cdn/shop/files/JedHenry-TheDestinedOn1.jpg?v=1730171536&width=949', price:1200, featured:true, videos:[] },
-        { id:'art2', title:'Threads of Home', artistId:'a2', description:'A woven tapestry reimagining rural patterns. Cultural notes: traditional weaving motifs.', image:'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=900&q=80', price:800, featured:true, videos:[] },
-        { id:'art3', title:'Golden Hour Study', artistId:'a1', description:'Study in light and shadow, capturing late afternoon.', image:'https://images.unsplash.com/photo-1481349518771-20055b2a7b24?auto=format&fit=crop&w=900&q=80', price:450, featured:false, videos:[] }
-      ],
-      events: [
-        { id:'e1', title:'Solar Narratives - An Exhibition', venue:'City Art Hall', date:'2025-11-13', time:'4:00 PM', curator: { name:'R. Sen', photo:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=60' }, items:['art1','art3'] },
-        { id:'e2', title:'Weave & Pattern', venue:'Studio 12', date:'2025-11-29', time:'6:00 PM', curator: { name:'Leena Gupta', photo:'https://images.unsplash.com/photo-1545996124-1b4b9ba6fdb4?auto=format&fit=crop&w=100&q=60' }, items:['art2'] }
-      ]
-    };
 
-    /* ====== Persistence ====== */
-    const STORAGE_KEY = 'fedf_ps16_store_v1';
-    const CURRENT_USER_KEY = 'fedf_ps16_currentUser';
-    function loadStore() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        const init = { users: seed.users.slice(), artists: seed.artists.slice(), artworks: seed.artworks.slice(), events: seed.events.slice(), cart: [] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(init));
-        return init;
-      }
-      try { return JSON.parse(raw); } catch(e) { localStorage.removeItem(STORAGE_KEY); return loadStore(); }
-    }
-    function saveStore(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+    ensureSeedMerged();
 
     let store = loadStore();
     let currentUser = loadCurrentUser();
 
-    // Ensure seeded entries exist in store (useful when localStorage was created before adding new seeds)
-    (function ensureSeedMerged(){
-      let changed = false;
-      // users by email
-      seed.users.forEach(su => {
-        if (!store.users.some(u => u.email === su.email)) { store.users.push(su); changed = true; }
-      });
-      // artists by id
-      seed.artists.forEach(sa => {
-        if (!store.artists.some(a => a.id === sa.id)) { store.artists.push(sa); changed = true; }
-      });
-      // artworks by id
-      seed.artworks.forEach(sa => {
-        if (!store.artworks.some(a => a.id === sa.id)) { store.artworks.push(sa); changed = true; }
-      });
-      // events by id
-      seed.events.forEach(se => {
-        if (!store.events.some(e => e.id === se.id)) { store.events.push(se); changed = true; }
-      });
-      if (changed) saveStore(store);
-    })();
-
     function saveCurrentUser() {
-      if (currentUser) sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
-      else sessionStorage.removeItem(CURRENT_USER_KEY);
+      saveUserToSession(currentUser);
     }
-    function loadCurrentUser() { try { return JSON.parse(sessionStorage.getItem(CURRENT_USER_KEY)); } catch(e){ return null; } }
 
     /* ====== Router helpers ====== */
     function navigateTo(hash) { location.hash = hash; }
@@ -103,7 +47,7 @@ export function initLegacyApp() {
     const CAROUSEL_INTERVAL_MS = 5000;
     function renderCarousel() {
       clearInterval(carouselTimer);
-      const featured = store.artworks.filter(a=>a.featured);
+      const featured = store.artworks.filter(a => a.featured);
       if (!carouselStage) return;
       carouselStage.innerHTML = '';
       if (featured.length === 0) {
@@ -118,33 +62,30 @@ export function initLegacyApp() {
         img.src = art.image;
         img.alt = art.title;
         img.style.cursor = 'pointer';
-        img.addEventListener('click', ()=> navigateTo('#art-'+art.id));
+        img.addEventListener('click', () => navigateTo('#art-' + art.id));
         carouselStage.appendChild(img);
         const caption = document.createElement('div');
         caption.className = 'carousel-caption';
-        caption.textContent = art.title + ' — ' + (artistById(art.artistId)?.name || 'Unknown');
+        caption.textContent = art.title + ' — ' + (artistById(store, art.artistId)?.name || 'Unknown');
         carouselStage.appendChild(caption);
       }
       show(idx);
-      carouselTimer = setInterval(()=> { idx = (idx+1) % featured.length; show(idx); }, CAROUSEL_INTERVAL_MS);
+      carouselTimer = setInterval(() => { idx = (idx + 1) % featured.length; show(idx); }, CAROUSEL_INTERVAL_MS);
     }
-
-    function artistById(id) { return store.artists.find(a=>a.id===id); }
-    function artById(id) { return store.artworks.find(a=>a.id===id); }
 
     /* ====== Recent list ====== */
     function renderRecentList() {
-      const recent = store.artworks.slice(0,6);
+      const recent = store.artworks.slice(0, 6);
       const container = document.getElementById('recentList');
       if (!container) return;
       container.innerHTML = '';
       if (!recent.length) { container.innerHTML = '<div class="muted">No artworks yet.</div>'; return; }
-      recent.forEach(art=>{
+      recent.forEach(art => {
         const row = document.createElement('div');
-        row.className='list-row';
+        row.className = 'list-row';
         row.innerHTML = `
       <div class="thumb"><img src="${art.image}" alt="${escapeHtml(art.title)}"></div>
-      <div class="meta"><strong><a href="#art-${art.id}">${escapeHtml(art.title)}</a></strong><div class="muted">by <a href="#artist-${art.artistId}">${escapeHtml(artistById(art.artistId)?.name||'Unknown')}</a></div></div>
+      <div class="meta"><strong><a href="#art-${art.id}">${escapeHtml(art.title)}</a></strong><div class="muted">by <a href="#artist-${art.artistId}">${escapeHtml(artistById(store, art.artistId)?.name || 'Unknown')}</a></div></div>
       <div style="min-width:90px;text-align:right"><div class="muted">₹${art.price}</div></div>
     `;
         container.appendChild(row);
@@ -164,7 +105,7 @@ export function initLegacyApp() {
       const featuredAns = prompt('Feature this artwork on the carousel? (yes/no):') || 'no';
       const featured = String(featuredAns).toLowerCase().startsWith('y');
 
-      const id = 'art_'+Date.now();
+      const id = 'art_' + Date.now();
       const newArt = { id, title: title.trim(), artistId: artist.id, description: description.trim(), image: image.trim() || '', price, featured, videos: [] };
       store.artworks.push(newArt);
       saveStore(store);
@@ -186,15 +127,15 @@ export function initLegacyApp() {
 
       const year = calDate.getFullYear();
       const month = calDate.getMonth();
-      calMonthTitle.textContent = calDate.toLocaleString(undefined, { month:'long', year:'numeric' });
+      calMonthTitle.textContent = calDate.toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
       calendarGrid.innerHTML = '';
       const firstDay = new Date(year, month, 1);
       const startDay = firstDay.getDay();
-      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-      for (let i=0;i<startDay;i++) {
-        const blank = document.createElement('div'); blank.className='cal-day'; blank.innerHTML=''; calendarGrid.appendChild(blank);
+      for (let i = 0; i < startDay; i++) {
+        const blank = document.createElement('div'); blank.className = 'cal-day'; blank.innerHTML = ''; calendarGrid.appendChild(blank);
       }
 
       const eventsByDate = {};
@@ -203,101 +144,45 @@ export function initLegacyApp() {
         eventsByDate[ev.date].push(ev);
       });
 
-      for (let d=1; d<=daysInMonth; d++) {
-        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const cell = document.createElement('div');
-        cell.className='cal-day';
+        cell.className = 'cal-day';
         cell.textContent = d;
         if (eventsByDate[dateStr]) {
           cell.classList.add('highlight');
-          cell.title = eventsByDate[dateStr].map(e=>e.title).join('; ');
-          cell.addEventListener('click', ()=> navigateTo('#event-'+eventsByDate[dateStr][0].id));
+          cell.title = eventsByDate[dateStr].map(e => e.title).join('; ');
+          cell.addEventListener('click', () => navigateTo('#event-' + eventsByDate[dateStr][0].id));
         }
         calendarGrid.appendChild(cell);
       }
 
-      upcomingEventsList.innerHTML='';
-      const upcoming = store.events.slice().sort((a,b)=> new Date(a.date) - new Date(b.date)).slice(0,4);
-      upcoming.forEach(ev=>{
-        const r = document.createElement('div'); r.className='list-row';
-        r.innerHTML = `
-      <div class="thumb"><img src="${ev.items && ev.items[0] ? (artById(ev.items[0])?.image||'') : ''}" alt=""></div>
-      <div class="meta"><strong><a href="#event-${ev.id}">${escapeHtml(ev.title)}</a></strong><div class="muted">${ev.date} • ${ev.time}</div></div>
-    `;
+      upcomingEventsList.innerHTML = '';
+      const upcoming = store.events.slice().sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 4);
+      upcoming.forEach(ev => {
+        const r = document.createElement('div'); r.className = 'list-row';
+          r.innerHTML = `
+        <div class="thumb"><img src="${ev.items && ev.items[0] ? (artById(store, ev.items[0])?.image || '') : ''}" alt=""></div>
+        <div class="meta"><strong><a href="#event-${ev.id}">${escapeHtml(ev.title)}</a></strong><div class="muted">${ev.date} • ${ev.time}</div></div>
+      `;
         upcomingEventsList.appendChild(r);
       });
     }
 
     const prevBtn = document.getElementById('prevMonth');
     const nextBtn = document.getElementById('nextMonth');
-    if (prevBtn) prevBtn.addEventListener('click', ()=> { calDate.setMonth(calDate.getMonth()-1); renderCalendar(); });
-    if (nextBtn) nextBtn.addEventListener('click', ()=> { calDate.setMonth(calDate.getMonth()+1); renderCalendar(); });
+    if (prevBtn) prevBtn.addEventListener('click', () => { calDate.setMonth(calDate.getMonth() - 1); renderCalendar(); });
+    if (nextBtn) nextBtn.addEventListener('click', () => { calDate.setMonth(calDate.getMonth() + 1); renderCalendar(); });
 
     /* ====== Search ====== */
-    // Use delegated handlers and read the input element at runtime so listeners remain valid
-    function doSearch() {
-      const inputEl = document.getElementById('searchInput');
-      const q = (inputEl && (inputEl.value || '').trim()) || '';
-      if (!q) { /* empty search -> go home */ navigateTo('#home'); return; }
-      doSearchWithQ(q);
-      navigateTo('#search-'+encodeURIComponent(q));
-    }
-
-    // Delegated click for search button (works even if the button node is recreated)
-    document.addEventListener('click', (ev) => {
-      const target = ev.target;
-      if (!target) return;
-      if (target.id === 'searchBtn' || (target.closest && target.closest('#searchBtn'))) {
-        doSearch();
-      }
-    });
-
-    // Also attach a direct listener to the search button if present so React-rendered
-    // header buttons respond immediately (this avoids edge cases where delegated clicks
-    // may not feel responsive in some UIs).
-    const _searchBtn = document.getElementById('searchBtn');
-    if (_searchBtn) {
-      _searchBtn.addEventListener('click', (e) => { e.preventDefault(); doSearch(); });
-    }
-
-    // Global key listener: Enter inside the search input runs search
-    document.addEventListener('keydown', (e) => {
-      const active = document.activeElement;
-      if (e.key === 'Enter' && active && active.id === 'searchInput') {
-        e.preventDefault();
-        doSearch();
-      }
-    });
-
-    function doSearchWithQ(rawQ) {
-      // Reload persisted data so search includes any changes saved to localStorage
-      store = loadStore();
-      const q = (rawQ||'').trim().toLowerCase();
-      if (!q) { navigateTo('#home'); return; }
-
-      // Simple substring search across artwork title/description and artist name/bio
-      const artResults = store.artworks.filter(a => {
-        const artText = (((a.title||'') + ' ' + (a.description||'')).toLowerCase());
-        if (artText.indexOf(q) !== -1) return true;
-        const artArtist = artistById(a.artistId);
-        const artistText = artArtist ? (((artArtist.name||'') + ' ' + (artArtist.bio||'')).toLowerCase()) : '';
-        if (artistText.indexOf(q) !== -1) return true;
-        return false;
-      });
-
-      const artistResults = store.artists.filter(a => (((a.name||'') + ' ' + (a.bio||'')).toLowerCase().indexOf(q) !== -1));
-
-      try { console.debug('[fedf] search q:', q, 'artworks:', artResults.map(a=>a.title), 'artists:', artistResults.map(a=>a.name)); } catch(e) {}
-
-      renderTemplateSearch(artResults, artistResults, rawQ);
-      const si = document.getElementById('searchInput'); if (si) si.value = rawQ;
-    }
+    // Search is now handled by React components (App.jsx / SearchResults.jsx)
+    // We keep the route handler for #search- to ensure we don't break if someone navigates manually
 
     // Expose a minimal JS API so React components can invoke search reliably
     try {
       if (typeof window !== 'undefined') {
-        window.fedfDoSearch = doSearch;
-        window.fedfDoSearchWithQ = doSearchWithQ;
+        window.fedfDoSearch = () => { };
+        window.fedfDoSearchWithQ = () => { };
       }
     } catch (e) { /* ignore */ }
 
@@ -313,14 +198,14 @@ export function initLegacyApp() {
       artResults.innerHTML = arts.length ? arts.map(a => `
     <div class="list-row">
       <div class="thumb"><img src="${a.image}" alt=""></div>
-      <div class="meta"><strong><a href="#art-${a.id}">${escapeHtml(a.title)}</a></strong><div class="muted">by <a href="#artist-${a.artistId}">${escapeHtml(artistById(a.artistId)?.name||'Unknown')}</a></div></div>
+      <div class="meta"><strong><a href="#art-${a.id}">${escapeHtml(a.title)}</a></strong><div class="muted">by <a href="#artist-${a.artistId}">${escapeHtml(artistById(store, a.artistId)?.name || 'Unknown')}</a></div></div>
       <div style="min-width:90px;text-align:right"><div class="muted">₹${a.price}</div></div>
     </div>`).join('') : '<div class="muted">No art pieces match your search.</div>';
 
-      artistResults.innerHTML = artists.length ? artists.map(a=>`
+      artistResults.innerHTML = artists.length ? artists.map(a => `
     <div class="list-row">
       <div class="thumb"><img src="${a.photo}" alt=""></div>
-      <div class="meta"><strong><a href="#artist-${a.id}">${escapeHtml(a.name)}</a></strong><div class="muted">${escapeHtml(a.bio||'')}</div></div>
+      <div class="meta"><strong><a href="#artist-${a.id}">${escapeHtml(a.name)}</a></strong><div class="muted">${escapeHtml(a.bio || '')}</div></div>
     </div>`).join('') : '<div class="muted">No artists match your search.</div>';
 
       // Prefer rendering to the dedicated search page if present
@@ -348,7 +233,7 @@ export function initLegacyApp() {
       try {
         const sp = document.getElementById('searchPage'); if (sp) sp.style.display = 'none';
         const pc = document.getElementById('pageContent'); if (pc) pc.style.display = '';
-      } catch (e) {}
+      } catch (e) { }
       if (hash.startsWith('#home')) {
         renderHome();
       } else if (hash.startsWith('#search-')) {
@@ -379,10 +264,10 @@ export function initLegacyApp() {
     }
 
     function renderHome() {
-        const pageContent = document.getElementById('pageContent');
-        if (!pageContent) return;
-        // Base home HTML
-        pageContent.innerHTML = `
+      const pageContent = document.getElementById('pageContent');
+      if (!pageContent) return;
+      // Base home HTML
+      pageContent.innerHTML = `
       <h3>Welcome to the Virtual Art Gallery</h3>
       <p class="muted">Explore artworks, learn cultural histories, join virtual tours and attend exhibitions. Use the search bar above to find art pieces or artists — example search term: <code>Sun</code>.</p>
       <div style="margin-top:12px;">
@@ -390,33 +275,33 @@ export function initLegacyApp() {
         <div id="recentList"></div>
       </div>
     `;
-        renderRecentList(); renderCarousel(); renderCalendar();
+      renderRecentList(); renderCarousel(); renderCalendar();
 
-        // If logged in as an artist, show upload button at bottom of home page
-        if (currentUser && currentUser.role === 'artist' && currentUser.artistId) {
-          const uploadWrap = document.createElement('div');
-          uploadWrap.style.marginTop = '14px';
-          uploadWrap.innerHTML = `<button id="uploadArtBtnHome" class="btn">Upload New Artwork</button>`;
-          pageContent.appendChild(uploadWrap);
-          const btn = document.getElementById('uploadArtBtnHome');
-          if (btn) btn.addEventListener('click', () => uploadArtworkPrompt(currentUser.artistId));
-        }
+      // If logged in as an artist, show upload button at bottom of home page
+      if (currentUser && currentUser.role === 'artist' && currentUser.artistId) {
+        const uploadWrap = document.createElement('div');
+        uploadWrap.style.marginTop = '14px';
+        uploadWrap.innerHTML = `<button id="uploadArtBtnHome" class="btn">Upload New Artwork</button>`;
+        pageContent.appendChild(uploadWrap);
+        const btn = document.getElementById('uploadArtBtnHome');
+        if (btn) btn.addEventListener('click', () => uploadArtworkPrompt(currentUser.artistId));
+      }
     }
 
     function renderArtistPage(id) {
-      const artist = store.artists.find(x=>x.id===id);
+      const artist = store.artists.find(x => x.id === id);
       const content = document.getElementById('pageContent');
       if (!content) return;
       if (!artist) { content.innerHTML = '<div class="muted">Artist not found.</div>'; return; }
-      const artistArts = store.artworks.filter(a=>a.artistId===id);
+      const artistArts = store.artworks.filter(a => a.artistId === id);
       content.innerHTML = `
     <div style="display:flex;gap:12px;align-items:center;">
       <div style="width:120px;height:120px;border-radius:8px;overflow:hidden;"><img src="${artist.photo}" alt="${escapeHtml(artist.name)}"></div>
       <div>
         <h2>${escapeHtml(artist.name)}</h2>
-        <p class="muted">${escapeHtml(artist.bio||'')}</p>
+        <p class="muted">${escapeHtml(artist.bio || '')}</p>
         <div style="margin-top:8px;">
-          ${currentUser && currentUser.role==='artist' && currentUser.artistId===artist.id ? '<button id="uploadArtBtn" class="btn">Upload New Artwork</button>' : ''}
+          ${currentUser && currentUser.role === 'artist' && currentUser.artistId === artist.id ? '<button id="uploadArtBtn" class="btn">Upload New Artwork</button>' : ''}
         </div>
       </div>
     </div>
@@ -426,12 +311,12 @@ export function initLegacyApp() {
     </div>
   `;
       const list = document.getElementById('artistArtList');
-      artistArts.forEach(a=>{
-        const r = document.createElement('div'); r.className='list-row';
+      artistArts.forEach(a => {
+        const r = document.createElement('div'); r.className = 'list-row';
         // show delete button to artist owner next to price
-        const delBtnHtml = (currentUser && currentUser.role==='artist' && currentUser.artistId===artist.id) ? `<button class="btn secondary" data-artid="${a.id}">Delete</button>` : '';
+        const delBtnHtml = (currentUser && currentUser.role === 'artist' && currentUser.artistId === artist.id) ? `<button class="btn secondary" data-artid="${a.id}">Delete</button>` : '';
         r.innerHTML = `<div class="thumb"><img src="${a.image}" alt=""></div>
-      <div class="meta"><strong><a href="#art-${a.id}">${escapeHtml(a.title)}</a></strong><div class="muted">${escapeHtml((a.description||'').substring(0,120))}...</div></div>
+      <div class="meta"><strong><a href="#art-${a.id}">${escapeHtml(a.title)}</a></strong><div class="muted">${escapeHtml((a.description || '').substring(0, 120))}...</div></div>
       <div style="min-width:140px;text-align:right"><div class="muted">₹${a.price}</div><div style="margin-top:6px">${delBtnHtml}</div></div>`;
         list.appendChild(r);
       });
@@ -462,9 +347,9 @@ export function initLegacyApp() {
     const homeBtn = document.getElementById('homeBtn');
     if (homeBtn) {
       homeBtn.addEventListener('click', () => {
-  // Navigate to home and reset key UI pieces
-  navigateTo('#home');
-  try { const _si = document.getElementById('searchInput'); if (_si) _si.value = ''; } catch(e){}
+        // Navigate to home and reset key UI pieces
+        navigateTo('#home');
+        try { const _si = document.getElementById('searchInput'); if (_si) _si.value = ''; } catch (e) { }
         calDate = new Date();
         renderCalendar();
         renderCarousel();
@@ -475,11 +360,11 @@ export function initLegacyApp() {
     }
 
     function renderArtPage(id) {
-      const art = store.artworks.find(x=>x.id===id);
+      const art = store.artworks.find(x => x.id === id);
       const content = document.getElementById('pageContent');
       if (!content) return;
       if (!art) { content.innerHTML = '<div class="muted">Artwork not found.</div>'; return; }
-      const artist = artistById(art.artistId);
+      const artist = artistById(store, art.artistId);
       content.innerHTML = `
     <div class="art-hero">
       <img src="${art.image}" alt="${escapeHtml(art.title)}">
@@ -504,8 +389,8 @@ export function initLegacyApp() {
 
       const mediaArea = document.getElementById('mediaArea');
       if (art.videos && art.videos.length) {
-        art.videos.forEach(src=>{
-          const vid = document.createElement('video'); vid.controls=true; vid.style.maxWidth='100%'; vid.src = src;
+        art.videos.forEach(src => {
+          const vid = document.createElement('video'); vid.controls = true; vid.style.maxWidth = '100%'; vid.src = src;
           mediaArea.appendChild(vid);
         });
       } else {
@@ -514,7 +399,7 @@ export function initLegacyApp() {
 
       const addToCartBtn = document.getElementById('addToCartBtn');
       const buyNowBtn = document.getElementById('buyNowBtn');
-      if (addToCartBtn) addToCartBtn.addEventListener('click', ()=> {
+      if (addToCartBtn) addToCartBtn.addEventListener('click', () => {
         if (!ensureLoggedIn()) return;
         if (currentUser.role === 'artist') { alert('Artist accounts cannot buy items. Please use a visitor account.'); return; }
         store.cart = store.cart || [];
@@ -522,7 +407,7 @@ export function initLegacyApp() {
         saveStore(store); updateHeader();
         alert('Added to cart (dummy).');
       });
-      if (buyNowBtn) buyNowBtn.addEventListener('click', ()=> {
+      if (buyNowBtn) buyNowBtn.addEventListener('click', () => {
         if (!ensureLoggedIn()) return;
         if (currentUser.role === 'artist') { alert('Artist accounts cannot buy items. Please use a visitor account.'); return; }
         alert('Purchase simulated (dummy). Thank you!'); store.cart = []; saveStore(store); updateHeader();
@@ -530,13 +415,13 @@ export function initLegacyApp() {
     }
 
     function renderEventPage(id) {
-      const ev = store.events.find(x=>x.id===id);
+      const ev = store.events.find(x => x.id === id);
       const content = document.getElementById('pageContent');
       if (!content) return;
       if (!ev) { content.innerHTML = '<div class="muted">Event not found.</div>'; return; }
       content.innerHTML = `
     <div style="display:flex;gap:18px;align-items:center;">
-      <div style="width:220px"><img src="${ev.items && ev.items[0] ? (artById(ev.items[0])?.image||'') : ''}" alt="${escapeHtml(ev.title)}" style="width:100%;border-radius:8px"></div>
+      <div style="width:220px"><img src="${ev.items && ev.items[0] ? (artById(store, ev.items[0])?.image || '') : ''}" alt="${escapeHtml(ev.title)}" style="width:100%;border-radius:8px"></div>
       <div>
         <h2>${escapeHtml(ev.title)}</h2>
         <div class="muted">${escapeHtml(ev.venue)} • ${ev.date} • ${ev.time}</div>
@@ -553,10 +438,10 @@ export function initLegacyApp() {
   `;
       const list = document.getElementById('eventItemsList');
       ev.items.forEach(itemId => {
-        const art = artById(itemId);
-        const row = document.createElement('div'); row.className='list-row';
-        row.innerHTML = `<div class="thumb"><img src="${art?.image||''}" alt=""></div>
-      <div class="meta"><strong><a href="#art-${art?.id}">${escapeHtml(art?.title||'')}</a></strong><div class="muted">${escapeHtml(artistById(art?.artistId)?.name||'')}</div></div>`;
+        const art = artById(store, itemId);
+        const row = document.createElement('div'); row.className = 'list-row';
+        row.innerHTML = `<div class="thumb"><img src="${art?.image || ''}" alt=""></div>
+      <div class="meta"><strong><a href="#art-${art?.id}">${escapeHtml(art?.title || '')}</a></strong><div class="muted">${escapeHtml(artistById(store, art?.artistId)?.name || '')}</div></div>`;
         list.appendChild(row);
       });
     }
@@ -610,20 +495,20 @@ export function initLegacyApp() {
       const vRegBtn = document.getElementById('vRegBtn');
       const aRegBtn = document.getElementById('aRegBtn');
 
-      if (vLoginBtn) vLoginBtn.addEventListener('click', ()=> {
+      if (vLoginBtn) vLoginBtn.addEventListener('click', () => {
         const email = document.getElementById('v_email').value.trim();
         const pass = document.getElementById('v_pass').value;
-        const user = store.users.find(u=>u.email===email && u.password===pass && (u.role==='visitor' || u.role==='admin' || u.role==='curator'));
-        if (user) { currentUser = user; saveCurrentUser(); alert(user.role==='admin'? 'Admin logged in.' : (user.role==='curator' ? 'Curator logged in.' : 'Visitor logged in.')); updateHeader(); navigateTo('#home'); }
+        const user = store.users.find(u => u.email === email && u.password === pass && (u.role === 'visitor' || u.role === 'admin' || u.role === 'curator'));
+        if (user) { currentUser = user; saveCurrentUser(); alert(user.role === 'admin' ? 'Admin logged in.' : (user.role === 'curator' ? 'Curator logged in.' : 'Visitor logged in.')); updateHeader(); navigateTo('#home'); }
         else alert('Invalid visitor/admin/curator credentials or account not found.');
       });
 
-      if (aLoginBtn) aLoginBtn.addEventListener('click', ()=> {
+      if (aLoginBtn) aLoginBtn.addEventListener('click', () => {
         const email = document.getElementById('a_email').value.trim();
         const pass = document.getElementById('a_pass').value;
-        const user = store.users.find(u=>u.email===email && u.password===pass && u.role==='artist');
+        const user = store.users.find(u => u.email === email && u.password === pass && u.role === 'artist');
         if (user) {
-          const artistProfile = store.artists.find(a => a.email===email || a.id===user.artistId);
+          const artistProfile = store.artists.find(a => a.email === email || a.id === user.artistId);
           if (artistProfile && artistProfile.verified) {
             currentUser = user; saveCurrentUser(); alert('Artist logged in.'); updateHeader(); navigateTo('#home');
           } else {
@@ -636,10 +521,10 @@ export function initLegacyApp() {
 
       const cLoginBtnEl = document.getElementById('cLoginBtn');
       const cRegBtnEl = document.getElementById('cRegBtn');
-      if (cLoginBtnEl) cLoginBtnEl.addEventListener('click', ()=> {
+      if (cLoginBtnEl) cLoginBtnEl.addEventListener('click', () => {
         const email = document.getElementById('c_email').value.trim();
         const pass = document.getElementById('c_pass').value;
-        const user = store.users.find(u=>u.email===email && u.password===pass && u.role==='curator');
+        const user = store.users.find(u => u.email === email && u.password === pass && u.role === 'curator');
         if (user) {
           if (user.verified) {
             currentUser = user; saveCurrentUser(); alert('Curator logged in.'); updateHeader(); navigateTo('#curator');
@@ -650,10 +535,10 @@ export function initLegacyApp() {
           alert('Invalid curator credentials or account not found.');
         }
       });
-      if (cRegBtnEl) cRegBtnEl.addEventListener('click', ()=> navigateTo('#register?role=curator'));
+      if (cRegBtnEl) cRegBtnEl.addEventListener('click', () => navigateTo('#register?role=curator'));
 
-      if (vRegBtn) vRegBtn.addEventListener('click', ()=> navigateTo('#register?role=visitor'));
-      if (aRegBtn) aRegBtn.addEventListener('click', ()=> navigateTo('#register?role=artist'));
+      if (vRegBtn) vRegBtn.addEventListener('click', () => navigateTo('#register?role=visitor'));
+      if (aRegBtn) aRegBtn.addEventListener('click', () => navigateTo('#register?role=artist'));
     }
 
     function renderRegisterPage() {
@@ -667,45 +552,45 @@ export function initLegacyApp() {
       <input id="reg_name" placeholder="Full name" required>
       <input id="reg_email" placeholder="Email" required>
       <input id="reg_password" type="password" placeholder="Password" required>
-      ${role==='artist' ? '<input id="reg_bio" placeholder="Short artist bio (for approvals)">' : ''}
-      ${role==='curator' ? '<input id="reg_bio" placeholder="Short curator bio (for approvals)"><input id="reg_photo" placeholder="Photo URL (optional)">' : ''}
+      ${role === 'artist' ? '<input id="reg_bio" placeholder="Short artist bio (for approvals)">' : ''}
+      ${role === 'curator' ? '<input id="reg_bio" placeholder="Short curator bio (for approvals)"><input id="reg_photo" placeholder="Photo URL (optional)">' : ''}
       <div style="display:flex;gap:8px">
-        <button class="btn" id="doRegister">${role==='artist' ? 'Register as Artist' : (role==='curator' ? 'Register as Curator' : 'Register as Visitor')}</button>
+        <button class="btn" id="doRegister">${role === 'artist' ? 'Register as Artist' : (role === 'curator' ? 'Register as Curator' : 'Register as Visitor')}</button>
         <button class="btn secondary" id="cancelReg">Cancel</button>
       </div>
     </form>
-    <div style="margin-top:8px" class="muted">${role==='visitor' ? 'Visitor accounts are active immediately.' : 'Accounts require admin verification. After registering, please inform your admin to verify your account.'}</div>
+    <div style="margin-top:8px" class="muted">${role === 'visitor' ? 'Visitor accounts are active immediately.' : 'Accounts require admin verification. After registering, please inform your admin to verify your account.'}</div>
   `;
       const cancel = document.getElementById('cancelReg');
       const doRegister = document.getElementById('doRegister');
-      if (cancel) cancel.addEventListener('click', ()=> navigateTo('#login'));
-      if (doRegister) doRegister.addEventListener('click', ()=> {
+      if (cancel) cancel.addEventListener('click', () => navigateTo('#login'));
+      if (doRegister) doRegister.addEventListener('click', () => {
         const name = document.getElementById('reg_name').value.trim();
         const email = document.getElementById('reg_email').value.trim();
         const password = document.getElementById('reg_password').value;
         if (!name || !email || !password) { alert('Fill required fields'); return; }
-        if (store.users.some(u=>u.email===email)) { alert('Email already registered'); return; }
-        if (role==='visitor') {
-          const id = 'u_'+Date.now();
-          const newUser = { id, name, email, password, role:'visitor', verified:true };
+        if (store.users.some(u => u.email === email)) { alert('Email already registered'); return; }
+        if (role === 'visitor') {
+          const id = 'u_' + Date.now();
+          const newUser = { id, name, email, password, role: 'visitor', verified: true };
           store.users.push(newUser);
           saveStore(store);
           currentUser = newUser; saveCurrentUser(); updateHeader(); alert('Visitor registered and signed in.'); navigateTo('#home');
-        } else if (role==='artist') {
-          const artistId = 'a_'+Date.now();
-          const newArtist = { id: artistId, name, bio: (document.getElementById('reg_bio')?.value||''), verified:false, photo:'' , email };
+        } else if (role === 'artist') {
+          const artistId = 'a_' + Date.now();
+          const newArtist = { id: artistId, name, bio: (document.getElementById('reg_bio')?.value || ''), verified: false, photo: '', email };
           store.artists.push(newArtist);
-          const userId = 'u_'+Date.now();
-          const userRec = { id:userId, name, email, password, role:'artist', artistId, verified:false };
+          const userId = 'u_' + Date.now();
+          const userRec = { id: userId, name, email, password, role: 'artist', artistId, verified: false };
           store.users.push(userRec);
           saveStore(store);
           alert('Artist registered. Await admin verification.');
           navigateTo('#login');
-        } else if (role==='curator') {
-          const bio = document.getElementById('reg_bio')?.value||'';
-          const photo = document.getElementById('reg_photo')?.value||'';
-          const userId = 'u_'+Date.now();
-          const userRec = { id:userId, name, email, password, role:'curator', verified:false, bio, photo };
+        } else if (role === 'curator') {
+          const bio = document.getElementById('reg_bio')?.value || '';
+          const photo = document.getElementById('reg_photo')?.value || '';
+          const userId = 'u_' + Date.now();
+          const userRec = { id: userId, name, email, password, role: 'curator', verified: false, bio, photo };
           store.users.push(userRec);
           saveStore(store);
           alert('Curator registered. Await admin verification.');
@@ -721,16 +606,16 @@ export function initLegacyApp() {
       if (!cart.length) { content.innerHTML = '<h3>Your Cart</h3><div class="muted">Your cart is empty.</div>'; return; }
       content.innerHTML = `<h3>Your Cart</h3><div id="cartList"></div><div style="margin-top:12px"><button id="checkoutBtn" class="btn">Checkout (dummy)</button></div>`;
       const cartList = document.getElementById('cartList');
-      cart.forEach((c,i)=>{
-        const art = artById(c.artId) || { title:c.title };
-        const r = document.createElement('div'); r.className='list-row';
-        r.innerHTML = `<div class="thumb"><img src="${art.image||''}" alt=""></div>
+      cart.forEach((c, i) => {
+        const art = artById(store, c.artId) || { title: c.title };
+        const r = document.createElement('div'); r.className = 'list-row';
+        r.innerHTML = `<div class="thumb"><img src="${art.image || ''}" alt=""></div>
       <div class="meta"><strong>${escapeHtml(art.title)}</strong><div class="muted">Qty: 1</div></div>
       <div style="min-width:90px;text-align:right"><div class="muted">₹${c.price}</div></div>`;
         cartList.appendChild(r);
       });
       const checkoutBtn = document.getElementById('checkoutBtn');
-      if (checkoutBtn) checkoutBtn.addEventListener('click', ()=> {
+      if (checkoutBtn) checkoutBtn.addEventListener('click', () => {
         if (!ensureLoggedIn()) return;
         if (currentUser.role === 'artist') { alert('Artists cannot buy.'); return; }
         alert('Checkout simulated (dummy). Order placed.'); store.cart = []; saveStore(store); updateHeader(); renderCartPage();
@@ -750,17 +635,17 @@ export function initLegacyApp() {
 
       // --- Artist verifications ---
       const artistList = document.getElementById('artistVerifications');
-      const pendingArtists = store.artists.filter(a=>!a.verified);
+      const pendingArtists = store.artists.filter(a => !a.verified);
       if (!pendingArtists.length) artistList.innerHTML = '<div class="muted">No pending artist verifications.</div>';
-      pendingArtists.forEach(a=>{
-        const r = document.createElement('div'); r.className='list-row';
-        r.innerHTML = `<div class="thumb"><img src="${a.photo||'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=60'}" alt=""></div>
-      <div class="meta"><strong>${escapeHtml(a.name)}</strong><div class="muted">${escapeHtml(a.bio||'')}</div></div>
+      pendingArtists.forEach(a => {
+        const r = document.createElement('div'); r.className = 'list-row';
+        r.innerHTML = `<div class="thumb"><img src="${a.photo || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=60'}" alt=""></div>
+      <div class="meta"><strong>${escapeHtml(a.name)}</strong><div class="muted">${escapeHtml(a.bio || '')}</div></div>
       <div><button class="btn" data-id="${a.id}">Approve</button></div>`;
         artistList.appendChild(r);
       });
 
-      artistList.addEventListener('click', (ev)=>{
+      artistList.addEventListener('click', (ev) => {
         if (ev.target.matches('button[data-id]')) {
           const id = ev.target.getAttribute('data-id'); approveArtistById(id);
         }
@@ -768,17 +653,17 @@ export function initLegacyApp() {
 
       // --- Curator verifications ---
       const curatorList = document.getElementById('curatorVerifications');
-      const pendingCurators = store.users.filter(u=>u.role==='curator' && !u.verified);
+      const pendingCurators = store.users.filter(u => u.role === 'curator' && !u.verified);
       if (!pendingCurators.length) curatorList.innerHTML = '<div class="muted">No pending curator verifications.</div>';
-      pendingCurators.forEach(u=>{
-        const r = document.createElement('div'); r.className='list-row';
-        r.innerHTML = `<div class="thumb"><img src="${u.photo||'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=60'}" alt=""></div>
-      <div class="meta"><strong>${escapeHtml(u.name)}</strong><div class="muted">${escapeHtml(u.bio||'')}</div></div>
+      pendingCurators.forEach(u => {
+        const r = document.createElement('div'); r.className = 'list-row';
+        r.innerHTML = `<div class="thumb"><img src="${u.photo || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=60'}" alt=""></div>
+      <div class="meta"><strong>${escapeHtml(u.name)}</strong><div class="muted">${escapeHtml(u.bio || '')}</div></div>
       <div><button class="btn" data-curator-id="${u.id}">Approve</button></div>`;
         curatorList.appendChild(r);
       });
 
-      curatorList.addEventListener('click', (ev)=>{
+      curatorList.addEventListener('click', (ev) => {
         if (ev.target.matches('button[data-curator-id]')) {
           const id = ev.target.getAttribute('data-curator-id'); approveCuratorById(id);
         }
@@ -794,23 +679,23 @@ export function initLegacyApp() {
 
       const curatorEvents = document.getElementById('curatorEvents');
       if (!store.events.length) curatorEvents.innerHTML = '<div class="muted">No events yet.</div>';
-      store.events.forEach(ev=>{
-        const r = document.createElement('div'); r.className='list-row';
-        r.innerHTML = `<div class="thumb"><img src="${ev.items && ev.items[0] ? (artById(ev.items[0])?.image||'') : ''}" alt=""></div>
+      store.events.forEach(ev => {
+        const r = document.createElement('div'); r.className = 'list-row';
+        r.innerHTML = `<div class="thumb"><img src="${ev.items && ev.items[0] ? (artById(store, ev.items[0])?.image || '') : ''}" alt=""></div>
       <div class="meta"><strong>${escapeHtml(ev.title)}</strong><div class="muted">${ev.date} • ${ev.time} • ${escapeHtml(ev.venue)}</div></div>
       <div style="min-width:90px;text-align:right"><button class="btn secondary" data-delete="${ev.id}">Delete</button></div>`;
         curatorEvents.appendChild(r);
       });
 
-      curatorEvents.addEventListener('click', (ev)=>{ if (ev.target.matches('button[data-delete]')) deleteEventById(ev.target.getAttribute('data-delete')); });
+      curatorEvents.addEventListener('click', (ev) => { if (ev.target.matches('button[data-delete]')) deleteEventById(ev.target.getAttribute('data-delete')); });
 
       const createEventBtn = document.getElementById('createEventBtn');
-      if (createEventBtn) createEventBtn.addEventListener('click', ()=> {
+      if (createEventBtn) createEventBtn.addEventListener('click', () => {
         const title = prompt('Event title:'); if (!title) return;
         const date = prompt('Date (YYYY-MM-DD):'); if (!date) return;
         const time = prompt('Time (e.g. 6:00 PM):') || '';
         const venue = prompt('Venue:') || '';
-        const curatorName = currentUser ? currentUser.name : (prompt('Curator name:')||'');
+        const curatorName = currentUser ? currentUser.name : (prompt('Curator name:') || '');
         const curatorPhoto = prompt('Curator photo URL (optional):') || '';
 
         // Ask how many artworks to add and collect their titles & image URLs
@@ -818,65 +703,65 @@ export function initLegacyApp() {
         const num = Math.max(0, parseInt(numStr, 10) || 0);
 
         // ensure a curator artist profile exists to associate uploaded works
-        const curatorArtistId = 'a_curator_'+(currentUser ? currentUser.id : ('anon_'+Date.now()));
-        if (!store.artists.find(a=>a.id===curatorArtistId)) {
-          store.artists.push({ id: curatorArtistId, name: curatorName, bio: 'Works added by curator', verified:true, photo: curatorPhoto || '' });
+        const curatorArtistId = 'a_curator_' + (currentUser ? currentUser.id : ('anon_' + Date.now()));
+        if (!store.artists.find(a => a.id === curatorArtistId)) {
+          store.artists.push({ id: curatorArtistId, name: curatorName, bio: 'Works added by curator', verified: true, photo: curatorPhoto || '' });
         }
 
         const items = [];
-        for (let i=0;i<num;i++) {
-          const atitle = prompt(`Artwork #${i+1} title:`) || '';
+        for (let i = 0; i < num; i++) {
+          const atitle = prompt(`Artwork #${i + 1} title:`) || '';
           if (!atitle) continue;
-          const aimg = prompt(`Artwork #${i+1} image URL:`) || '';
-          const adesc = prompt(`Artwork #${i+1} short description (optional):`) || '';
-          const aprice = Number(prompt(`Artwork #${i+1} price (number):`) || '0') || 0;
-          const aid = 'art_'+Date.now() + '_' + i;
-          const newArt = { id: aid, title: atitle.trim(), artistId: curatorArtistId, description: adesc.trim(), image: aimg.trim() || '', price: aprice, featured:false, videos:[] };
+          const aimg = prompt(`Artwork #${i + 1} image URL:`) || '';
+          const adesc = prompt(`Artwork #${i + 1} short description (optional):`) || '';
+          const aprice = Number(prompt(`Artwork #${i + 1} price (number):`) || '0') || 0;
+          const aid = 'art_' + Date.now() + '_' + i;
+          const newArt = { id: aid, title: atitle.trim(), artistId: curatorArtistId, description: adesc.trim(), image: aimg.trim() || '', price: aprice, featured: false, videos: [] };
           store.artworks.push(newArt);
           items.push(aid);
         }
 
-        const id = 'e_'+Date.now();
-        store.events.push({ id, title, venue, date, time, curator:{ name:curatorName, photo:curatorPhoto }, items });
+        const id = 'e_' + Date.now();
+        store.events.push({ id, title, venue, date, time, curator: { name: curatorName, photo: curatorPhoto }, items });
         saveStore(store); alert('Event created.'); renderCuratorPanel(); renderCalendar();
       });
     }
 
     function approveArtistById(id) {
-      const artist = store.artists.find(a=>a.id===id); if (!artist) return alert('Artist not found');
+      const artist = store.artists.find(a => a.id === id); if (!artist) return alert('Artist not found');
       artist.verified = true;
-      store.users.filter(u=>u.role==='artist' && u.artistId===id).forEach(u=>u.verified=true);
+      store.users.filter(u => u.role === 'artist' && u.artistId === id).forEach(u => u.verified = true);
       saveStore(store); alert('Artist approved.'); renderAdminPanel();
     }
-    
+
     function approveCuratorById(id) {
-      const user = store.users.find(u=>u.id===id);
+      const user = store.users.find(u => u.id === id);
       if (!user) return alert('Curator not found');
       user.verified = true;
       saveStore(store);
       alert('Curator approved.');
       renderAdminPanel();
     }
-        function deleteEventById(id) { store.events = store.events.filter(e=>e.id!==id); saveStore(store); alert('Event removed'); renderAdminPanel(); renderCalendar(); }
+    function deleteEventById(id) { store.events = store.events.filter(e => e.id !== id); saveStore(store); alert('Event removed'); renderAdminPanel(); renderCalendar(); }
 
-        function deleteArtworkById(id) {
-          const art = store.artworks.find(a=>a.id===id);
-          if (!art) return alert('Artwork not found');
-          store.artworks = store.artworks.filter(a=>a.id!==id);
-          // remove from any events that referenced it
-          store.events = store.events.map(ev => ({ ...ev, items: (ev.items || []).filter(i => i !== id) }));
-          saveStore(store);
-          alert('Artwork removed.');
-          // update widgets
-          updateHeader(); renderCarousel(); renderRecentList(); renderCalendar();
-          // if current route included this art, navigate home
-          if (location.hash && location.hash.includes(id)) navigateTo('#home');
-        }
+    function deleteArtworkById(id) {
+      const art = store.artworks.find(a => a.id === id);
+      if (!art) return alert('Artwork not found');
+      store.artworks = store.artworks.filter(a => a.id !== id);
+      // remove from any events that referenced it
+      store.events = store.events.map(ev => ({ ...ev, items: (ev.items || []).filter(i => i !== id) }));
+      saveStore(store);
+      alert('Artwork removed.');
+      // update widgets
+      updateHeader(); renderCarousel(); renderRecentList(); renderCalendar();
+      // if current route included this art, navigate home
+      if (location.hash && location.hash.includes(id)) navigateTo('#home');
+    }
 
-    function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function escapeHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     function ensureLoggedIn() { if (currentUser) return true; alert('Please login first.'); navigateTo('#login'); return false; }
-  function ensureAdmin() { return currentUser && currentUser.role==='admin'; }
-  function ensureCurator() { return currentUser && currentUser.role==='curator'; }
+    function ensureAdmin() { return currentUser && currentUser.role === 'admin'; }
+    function ensureCurator() { return currentUser && currentUser.role === 'curator'; }
 
     function initApp() {
       store.cart = store.cart || [];
@@ -886,7 +771,7 @@ export function initLegacyApp() {
     }
     initApp();
 
-    if (greetingEl) greetingEl.addEventListener('click', ()=> {
+    if (greetingEl) greetingEl.addEventListener('click', () => {
       if (!currentUser) return;
       const ok = confirm('Sign out?');
       if (ok) { currentUser = null; saveCurrentUser(); updateHeader(); alert('Signed out.'); navigateTo('#home'); }
