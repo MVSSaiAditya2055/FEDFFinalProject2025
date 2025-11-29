@@ -273,35 +273,21 @@ export function initLegacyApp() {
       // Reload persisted data so search includes any changes saved to localStorage
       store = loadStore();
       const q = (rawQ||'').trim().toLowerCase();
-      const tokens = q.split(/\s+/).filter(Boolean);
-      // Debug: show what tokens we're searching for and current store sizes
-      try { console.debug('[fedf] search tokens:', tokens, 'artists:', (store.artists||[]).length, 'artworks:', (store.artworks||[]).length); } catch(e) {}
+      if (!q) { navigateTo('#home'); return; }
 
-      // helper: does text contain any token?
-      const containsAny = (text) => {
-        if (!tokens.length) return false;
-        const t = (text||'').toLowerCase();
-        return tokens.some(tok => t.indexOf(tok) !== -1);
-      };
-
-      // artworks that match title/description or artist fields
-      const byText = store.artworks.filter(a => containsAny((a.title||'') + ' ' + (a.description||'')));
-
-      // artists that match name/bio
-      const artistResults = store.artists.filter(a => containsAny((a.name||'') + ' ' + (a.bio||'')));
-
-      // include artworks whose artist matches the tokens
-      const byArtistMatch = store.artworks.filter(a => {
+      // Simple substring search across artwork title/description and artist name/bio
+      const artResults = store.artworks.filter(a => {
+        const artText = (((a.title||'') + ' ' + (a.description||'')).toLowerCase());
+        if (artText.indexOf(q) !== -1) return true;
         const artArtist = artistById(a.artistId);
-        if (!artArtist) return false;
-        return containsAny((artArtist.name||'') + ' ' + (artArtist.bio||''));
+        const artistText = artArtist ? (((artArtist.name||'') + ' ' + (artArtist.bio||'')).toLowerCase()) : '';
+        if (artistText.indexOf(q) !== -1) return true;
+        return false;
       });
 
-      // merge and dedupe artwork results (include both matches)
-      const mergedArtsMap = {};
-      byText.concat(byArtistMatch).forEach(a => { if (a && a.id) mergedArtsMap[a.id] = a; });
-      const artResults = Object.keys(mergedArtsMap).map(k => mergedArtsMap[k]);
-      try { console.debug('[fedf] artResults:', artResults.map(a=>a.title)); console.debug('[fedf] artistResults:', artistResults.map(a=>a.name)); } catch(e) {}
+      const artistResults = store.artists.filter(a => (((a.name||'') + ' ' + (a.bio||'')).toLowerCase().indexOf(q) !== -1));
+
+      try { console.debug('[fedf] search q:', q, 'artworks:', artResults.map(a=>a.title), 'artists:', artistResults.map(a=>a.name)); } catch(e) {}
 
       renderTemplateSearch(artResults, artistResults, rawQ);
       const si = document.getElementById('searchInput'); if (si) si.value = rawQ;
