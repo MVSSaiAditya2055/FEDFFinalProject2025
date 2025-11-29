@@ -218,11 +218,7 @@ export function initLegacyApp() {
         return;
       }
 
-      let content = document.getElementById('pageContent');
-      // If the React `Home` (pageContent) isn't mounted because React is showing search results,
-      // fall back to rendering into the dedicated `searchPage` container so clicks from the
-      // React `SearchResults` component still show the art details correctly.
-      if (!content) content = document.getElementById('searchPage');
+      const content = document.getElementById('pageContent');
       if (!content) return;
       content.innerHTML = '';
       content.appendChild(clone);
@@ -294,8 +290,7 @@ export function initLegacyApp() {
 
     function renderArtistPage(id) {
       const artist = store.artists.find(x => x.id === id);
-      let content = document.getElementById('pageContent');
-      if (!content) content = document.getElementById('searchPage');
+      const content = document.getElementById('pageContent');
       if (!content) return;
       if (!artist) { content.innerHTML = '<div class="muted">Artist not found.</div>'; return; }
       const artistArts = store.artworks.filter(a => a.artistId === id);
@@ -715,11 +710,11 @@ export function initLegacyApp() {
 
         const items = [];
         for (let i = 0; i < num; i++) {
-          const atitle = prompt(`Artwork #${i + 1} title:`) || '';
-          if (!atitle) continue;
-          const aimg = prompt(`Artwork #${i + 1} image URL:`) || '';
-          const adesc = prompt(`Artwork #${i + 1} short description (optional):`) || '';
-          const aprice = Number(prompt(`Artwork #${i + 1} price (number):`) || '0') || 0;
+            const atitle = prompt(`Artwork #${i + 1} title:`) || '';
+            if (!atitle) continue;
+            const aimg = prompt(`Artwork #${i + 1} image URL:`) || '';
+            const adesc = prompt(`Artwork #${i + 1} short description (optional):`) || '';
+            const aprice = Number(prompt(`Artwork #${i + 1} price (number):`) || '0') || 0;
           const aid = 'art_' + Date.now() + '_' + i;
           const newArt = { id: aid, title: atitle.trim(), artistId: curatorArtistId, description: adesc.trim(), image: aimg.trim() || '', price: aprice, featured: false, videos: [] };
           store.artworks.push(newArt);

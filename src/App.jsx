@@ -17,11 +17,23 @@ export default function App() {
     // This keeps original app behavior while providing a React mount.
     initLegacyApp();
 
-    // Listen for hash changes to clear search if user navigates home
+    // Listen for hash changes to handle navigation between search and details
     const handleHashChange = () => {
-      if (location.hash === '#home' || location.hash === '') {
+      const hash = location.hash;
+      // If navigating back to a search URL, restore search mode
+      if (hash.startsWith('#search-')) {
+        const q = decodeURIComponent(hash.slice(8)); // remove #search-
+        if (q) {
+          setSearchQuery(q);
+          setSearchResults(searchData(q));
+          setIsSearching(true);
+        }
+      }
+      // If navigating to home or any detail page, exit search mode
+      else {
         setIsSearching(false);
-        setSearchQuery('');
+        // We don't clear searchQuery here so it persists if they go back, 
+        // but we do hide the search results view.
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -48,14 +60,17 @@ export default function App() {
       <Header onSearch={handleSearch} />
 
       <main id="app">
-        {isSearching ? (
+        {isSearching && (
           <SearchResults results={searchResults} query={searchQuery} />
-        ) : (
+        )}
+
+        {/* Keep Home mounted so legacy.js can find #pageContent when navigating to detail pages */}
+        <div style={{ display: isSearching ? 'none' : 'block' }}>
           <section>
             <Carousel />
             <Home />
           </section>
-        )}
+        </div>
 
         <Calendar />
       </main>
