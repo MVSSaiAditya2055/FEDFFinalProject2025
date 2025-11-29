@@ -14,7 +14,7 @@ export default function Header({ onSearch }) {
   return (
     <header>
       <button id="homeBtn" className="btn home-btn" title="Home" aria-label="Home">Home</button>
-      <div className="brand">Virtual Art Gallery — FEDF-PS16</div>
+      <div className="brand">ArtScape</div>
 
       <div className="search-container">
         <div className="search" role="search">
