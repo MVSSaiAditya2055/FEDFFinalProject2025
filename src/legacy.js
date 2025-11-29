@@ -1,7 +1,12 @@
 // Legacy app initializer: re-uses the original DOM-based app logic.
 // We wrap the original script in a function and export initLegacyApp()
 export function initLegacyApp() {
+  // Provide safe fallbacks immediately so React header handlers never call undefined
   try {
+    if (typeof window !== 'undefined') {
+      window.fedfDoSearch = function() { alert('Search is temporarily unavailable. Initializing app...'); };
+      window.fedfDoSearchWithQ = function(q) { alert('Search is temporarily unavailable. Initializing app...'); };
+    }
     /* ====== Client-side "Database" Seed Data ====== */
     const seed = {
       users: [
@@ -265,8 +270,12 @@ export function initLegacyApp() {
     });
 
     function doSearchWithQ(rawQ) {
+      // Reload persisted data so search includes any changes saved to localStorage
+      store = loadStore();
       const q = (rawQ||'').trim().toLowerCase();
       const tokens = q.split(/\s+/).filter(Boolean);
+      // Debug: show what tokens we're searching for and current store sizes
+      try { console.debug('[fedf] search tokens:', tokens, 'artists:', (store.artists||[]).length, 'artworks:', (store.artworks||[]).length); } catch(e) {}
 
       // helper: does text contain any token?
       const containsAny = (text) => {
@@ -292,6 +301,7 @@ export function initLegacyApp() {
       const mergedArtsMap = {};
       byText.concat(byArtistMatch).forEach(a => { if (a && a.id) mergedArtsMap[a.id] = a; });
       const artResults = Object.keys(mergedArtsMap).map(k => mergedArtsMap[k]);
+      try { console.debug('[fedf] artResults:', artResults.map(a=>a.title)); console.debug('[fedf] artistResults:', artistResults.map(a=>a.name)); } catch(e) {}
 
       renderTemplateSearch(artResults, artistResults, rawQ);
       const si = document.getElementById('searchInput'); if (si) si.value = rawQ;
@@ -327,6 +337,16 @@ export function initLegacyApp() {
       <div class="meta"><strong><a href="#artist-${a.id}">${escapeHtml(a.name)}</a></strong><div class="muted">${escapeHtml(a.bio||'')}</div></div>
     </div>`).join('') : '<div class="muted">No artists match your search.</div>';
 
+      // Prefer rendering to the dedicated search page if present
+      const searchPage = document.getElementById('searchPage');
+      if (searchPage) {
+        searchPage.innerHTML = '';
+        searchPage.appendChild(clone);
+        searchPage.style.display = '';
+        const content = document.getElementById('pageContent'); if (content) content.style.display = 'none';
+        return;
+      }
+
       const content = document.getElementById('pageContent');
       if (!content) return;
       content.innerHTML = '';
@@ -338,6 +358,11 @@ export function initLegacyApp() {
     function renderRoute() {
       const hash = location.hash || '#home';
       updateHeader();
+      // Hide search page by default; route handlers will show it when needed
+      try {
+        const sp = document.getElementById('searchPage'); if (sp) sp.style.display = 'none';
+        const pc = document.getElementById('pageContent'); if (pc) pc.style.display = '';
+      } catch (e) {}
       if (hash.startsWith('#home')) {
         renderHome();
       } else if (hash.startsWith('#search-')) {

@@ -52,6 +52,8 @@ export default function App() {
           </div>
         </div>
       </template>
+      {/* Dedicated search results page (legacy will render here when available) */}
+      <div id="searchPage" className="section" aria-live="polite" style={{ display: 'none' }}></div>
     </>
   )
 }

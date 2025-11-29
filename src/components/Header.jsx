@@ -1,17 +1,43 @@
-import React from 'react'
+import React, { useRef } from 'react'
 
 export default function Header(){
+  const inputRef = useRef(null);
+
+  function runSearch(q) {
+    const qTrim = (q || '').trim();
+    if (!qTrim) {
+      // empty -> go home
+      location.hash = '#home';
+      return;
+    }
+    try {
+      if (window && window.fedfDoSearchWithQ) {
+        window.fedfDoSearchWithQ(qTrim);
+        // also update hash for history
+        location.hash = '#search-' + encodeURIComponent(qTrim);
+        return;
+      }
+    } catch (e) { /* ignore */ }
+    // fallback: update URL hash so legacy router handles it when ready
+    location.hash = '#search-' + encodeURIComponent(qTrim);
+  }
+
   return (
     <header>
-  <button id="homeBtn" className="btn home-btn" title="Home" aria-label="Home">Home</button>
+      <button id="homeBtn" className="btn home-btn" title="Home" aria-label="Home">Home</button>
       <div className="brand">Virtual Art Gallery — FEDF-PS16</div>
 
       <div className="search-container">
         <div className="search" role="search">
-          <input id="searchInput" type="search" placeholder="Search artists, art pieces, keywords (e.g. Sun)..." aria-label="Search"
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (window && window.fedfDoSearch) window.fedfDoSearch(); } }}
+          <input id="searchInput" ref={inputRef} type="search" placeholder="Search artists, art pieces, keywords (e.g. Sun)..." aria-label="Search"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                runSearch(inputRef.current && inputRef.current.value);
+              }
+            }}
           />
-          <button id="searchBtn" onClick={() => { if (window && window.fedfDoSearch) window.fedfDoSearch(); else { const el = document.getElementById('searchBtn'); if (el) el.click(); } }}>Search</button>
+          <button id="searchBtn" onClick={() => runSearch(inputRef.current && inputRef.current.value)}>Search</button>
         </div>
       </div>
 
