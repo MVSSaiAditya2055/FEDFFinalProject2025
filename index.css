@@ -52,7 +52,7 @@
   .art-hero { display:flex; gap:18px; align-items:flex-start; }
   .art-hero img { width:420px; height:420px; object-fit:cover; border-radius:8px; box-shadow:0 10px 30px rgba(20,20,20,0.08); }
   .art-hero .details { flex:1; }
-  .curator-circle { width:72px; height:72px; border-radius:50%; overflow:hidden; border:3px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+  .curator-circle { width:72px; height:72px; border-radius:50%; overflow:hidden; border:3px solid #fff; box-shadow:0 6px 16px rgba(0,0,0,0.08); }
 
   /* ===== Admin panel ===== */
   .admin-grid { display:grid; grid-template-columns:1fr; gap:12px; }
